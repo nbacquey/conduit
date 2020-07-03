@@ -327,7 +327,7 @@ connectResume (SealedConduitT left0) (ConduitT right0) =
 
 sourceToPipe :: Monad m => Source m o -> Pipe l i o u m ()
 sourceToPipe =
-    go . flip unConduitT Done
+    go . \a -> unConduitT a Done
   where
     go (HaveOutput p o) = HaveOutput (go p) o
     go (NeedInput _ c) = go $ c ()
@@ -337,7 +337,7 @@ sourceToPipe =
 
 sinkToPipe :: Monad m => Sink i m r -> Pipe l i o u m r
 sinkToPipe =
-    go . injectLeftovers . flip unConduitT Done
+    go . injectLeftovers . \a -> unConduitT a Done
   where
     go (HaveOutput _ o) = absurd o
     go (NeedInput p c) = NeedInput (go . p) (const $ go $ c ())
@@ -347,7 +347,7 @@ sinkToPipe =
 
 conduitToPipe :: Monad m => Conduit i m o -> Pipe l i o u m ()
 conduitToPipe =
-    go . injectLeftovers . flip unConduitT Done
+    go . injectLeftovers . \a -> unConduitT a Done
   where
     go (HaveOutput p o) = HaveOutput (go p) o
     go (NeedInput p c) = NeedInput (go . p) (const $ go $ c ())
@@ -400,7 +400,7 @@ catchC :: (MonadUnliftIO m, Exception e)
 catchC (ConduitT p0) onErr = ConduitT $ \rest -> let
     go (Done r) = rest r
     go (PipeM mp) = PipeM $ withRunInIO $ \run -> E.catch (run (liftM go mp))
-        (return . flip unConduitT rest . onErr)
+        (return . (\a -> unConduitT a rest) . onErr)
     go (Leftover p i) = Leftover (go p) i
     go (NeedInput x y) = NeedInput (go . x) (go . y)
     go (HaveOutput p o) = HaveOutput (go p) o
@@ -692,7 +692,7 @@ passthroughSink (ConduitT sink0) final = ConduitT $ \rest -> let
 -- Since 1.2.6
 sourceToList :: Monad m => Source m a -> m [a]
 sourceToList =
-    go . flip unConduitT Done
+    go . \a -> unConduitT a Done
   where
     go (Done _) = return []
     go (HaveOutput src x) = liftM (x:) (go src)
